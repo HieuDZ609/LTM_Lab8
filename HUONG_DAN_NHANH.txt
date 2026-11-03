@@ -1,0 +1,78 @@
+==========================================================
+  ĐỒNG BỘ CSDL 2 SERVER – 2 CLIENT  (Java Swing + MySQL)
+  HƯỚNG DẪN NHANH
+==========================================================
+
+MÔ HÌNH
+  Server 1 (máy bạn)     : MySQL + Lock Manager
+  Server 2 (máy bạn bè)  : MySQL + replica
+  Client 1 (VM của bạn)  : app Java, ghi qua Server 1
+  Client 2 (VM bạn bè)   : app Java, ghi qua Server 1
+
+----------------------------------------------------------
+BƯỚC 1 – CÀI MYSQL (làm trên CẢ 2 SERVER, Ubuntu)
+----------------------------------------------------------
+  sudo bash scripts/setup_mysql_ubuntu.sh 1     # máy Server 1
+  sudo bash scripts/setup_mysql_ubuntu.sh 2     # máy Server 2
+
+  (Windows: xem docs/02_HUONG_DAN_TRIEN_KHAI.md)
+
+----------------------------------------------------------
+BƯỚC 2 – BẬT ĐỒNG BỘ HAI CHIỀU
+----------------------------------------------------------
+  Trên Server 1:  sudo bash scripts/setup_replication.sh <IP_SERVER_2>
+  Trên Server 2:  sudo bash scripts/setup_replication.sh <IP_SERVER_1>
+
+  Kiểm tra (cả 2 máy):
+    mysql -e "SHOW REPLICA STATUS\G" | grep -E "IO_Running|SQL_Running"
+  → phải thấy: Replica_IO_Running: Yes
+               Replica_SQL_Running: Yes
+
+----------------------------------------------------------
+BƯỚC 3 – SỬA IP TRONG config.properties
+----------------------------------------------------------
+  Lấy IP:  hostname -I
+
+  Mọi máy đều phải có:
+     lockManager.host = <IP_SERVER_1>     ← GIỐNG NHAU TRÊN CẢ 4 MÁY
+
+  Client 1: ROLE=CLIENT1  CLIENT_ID=CLIENT-1
+  Client 2: ROLE=CLIENT2  CLIENT_ID=CLIENT-2
+  Server 1: ROLE=SERVER1  CLIENT_ID=CLIENT-2
+  Server 2: ROLE=SERVER2  CLIENT_ID=CLIENT-2
+
+  Mẫu sẵn trong thư mục configs/:
+     cp configs/client1.properties config.properties
+
+----------------------------------------------------------
+BƯỚC 4 – CHẠY APP
+----------------------------------------------------------
+  Linux  :  ./run.sh
+  Windows:  run.bat
+
+  Cần JDK 17+  (Ubuntu: sudo apt install default-jdk)
+
+----------------------------------------------------------
+DEMO 5 BƯỚC
+----------------------------------------------------------
+  1. Client 1 tạo SV010          → Client 2 tải lại thấy SV010  (đồng bộ)
+  2. Client 2 tạo lại SV010      → báo "Mã đã tồn tại"         (chống trùng)
+  3. Client 1 khóa SV010         → nhận LOCK_TOKEN
+  4. Client 2 khóa SV010         → báo "đang được sử dụng"
+  5. Client 1 giải phóng → Client 2 khóa lại được
+
+----------------------------------------------------------
+TÀI KHOẢN MẶC ĐỊNH
+----------------------------------------------------------
+  appuser    / app123       (ứng dụng)
+  replicator / replica123   (đồng bộ)
+
+----------------------------------------------------------
+TÀI LIỆU
+----------------------------------------------------------
+  README.md                        tổng quan
+  docs/01_KIEN_TRUC.md             kiến trúc + lý do thiết kế
+  docs/02_HUONG_DAN_TRIEN_KHAI.md  hướng dẫn từng bước
+  docs/03_KICH_BAN_KIEM_THU.md     21 test case
+  docs/04_XU_LY_LOI.md             lỗi thường gặp
+==========================================================

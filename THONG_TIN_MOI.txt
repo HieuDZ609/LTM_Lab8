@@ -1,0 +1,18 @@
+ĐÃ TRIỂN KHAI TRÊN 3 VM + DESKTOP
+
+IP:
+- Desktop (bạn): 172.16.228.141  (MySQL + Lock Manager) - có thể chạy app làm CLIENT1
+- VM1: 172.16.228.145         (Server2) 
+- VM2: 172.16.228.146         (Client2)
+
+Tất cả đã cài MySQL, tạo shared_records, bật GTID replication.
+Server2 (145) replicate từ Server1 (141)
+Client2 VM (146) replicate từ Server1 (141)  
+Server1 replicate từ Server2 (145) - đồng bộ hai chiều
+
+Cấu hình app:
+- Desktop: cp configs/desktop_server1_client1.properties config.properties  -> ROLE=CLIENT1 CLIENT_ID=CLIENT-1
+- VM 145:   cp configs/vm_server2.properties config.properties  -> ROLE=SERVER2
+- VM 146:   cp configs/vm_client2.properties config.properties  -> ROLE=CLIENT2 CLIENT_ID=CLIENT-2
+
+Chạy: ./run.sh (Linux) hoặc run.bat (Windows)
