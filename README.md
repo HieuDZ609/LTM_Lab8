@@ -38,7 +38,7 @@
 
 > `lockManager.host` **luôn = `172.16.228.141`** trên cả 4 máy.
 >
-> ⚠️ Nếu 2 máy không ping/không kết nối được cổng 3306 của nhau: IP `172.16.x.x` và `192.168.x.x` là mạng **NAT nội bộ VMware**. Chuyển card mạng VM sang **Bridged** (hoặc dùng port forwarding 3307) — xem [mục 1 của docs/05](docs/05_HUONG_DAN_WINDOWS.md#1-️-đọc-trước--vmware-nat-và-địa-chỉ-ip).
+> ⚠️ Nếu 2 máy không ping/không kết nối được cổng 3306 của nhau: IP `172.16.x.x` và `192.168.x.x` là mạng **NAT nội bộ VMware**. Chuyển card mạng VM sang **Bridged** (hoặc dùng port forwarding 3307) — xem **mục 1** của [docs/05_HUONG_DAN_WINDOWS.md](docs/05_HUONG_DAN_WINDOWS.md).
 
 ---
 
