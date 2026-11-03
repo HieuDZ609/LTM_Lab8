@@ -1,3 +1,7 @@
 out/
 *.log
+*.class
+sources.txt
+*.bak_*
 .DS_Store
+Thumbs.db

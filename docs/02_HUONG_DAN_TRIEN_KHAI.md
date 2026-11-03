@@ -2,14 +2,15 @@
 
 Tài liệu này hướng dẫn triển khai trên **4 máy**:
 
-| Máy | Vai trò | Ví dụ IP |
+| Máy | Vai trò | IP |
 |---|---|---|
-| Server 1 | MySQL + Lock Manager | `192.168.1.10` |
-| Server 2 | MySQL replica | `192.168.1.20` |
-| Client 1 | Java Swing | `192.168.1.101` |
-| Client 2 | Java Swing | `192.168.1.102` |
+| Client 1 | Java Swing (máy bạn) | `172.26.40.121` |
+| Server 1 | MySQL + Lock Manager (VMware máy bạn) | `172.16.228.141` |
+| Client 2 | Java Swing (máy bạn bè, Windows) | `172.26.82.95` |
+| Server 2 | MySQL replica (VMware máy bạn bè) | `192.168.161.131` |
 
-> Thay các IP ví dụ bằng IP thật. Lấy IP bằng `hostname -I` (Linux) hoặc `ipconfig` (Windows).
+> Thay các IP trên bằng IP thật nếu DHCP đổi. Lấy IP bằng `hostname -I` (Linux) hoặc `ipconfig` (Windows).
+> Windows: xem riêng [`05_HUONG_DAN_WINDOWS.md`](05_HUONG_DAN_WINDOWS.md).
 
 ---
 
@@ -62,43 +63,24 @@ Script thực hiện:
 4. Tạo database `shared_records`, 2 bảng, 2 user
 5. Mở firewall cổng 3306
 
-### Nếu Server 2 chạy Windows
+### Nếu Server 2 chạy Windows (máy bạn bè)
 
-1. Tải **MySQL Installer** (mysql.com) → chọn *MySQL Server 8.4*
-2. Trong lúc cài, đặt root password
-3. Mở **MySQL Command Line Client**, chạy:
+> Hướng dẫn đầy đủ (cài JDK, MySQL Installer, firewall, lỗi thường gặp):
+> **[`05_HUONG_DAN_WINDOWS.md`](05_HUONG_DAN_WINDOWS.md)**
 
-```sql
-CREATE DATABASE shared_records CHARACTER SET utf8mb4;
-USE shared_records;
+Tóm tắt:
 
-CREATE TABLE records (
-  record_id BIGINT AUTO_INCREMENT PRIMARY KEY,
-  record_code VARCHAR(50) NOT NULL,
-  record_name VARCHAR(150) NOT NULL,
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  CONSTRAINT uq_record_code UNIQUE (record_code)
-) ENGINE=InnoDB;
+1. Cài **JDK 21** (<https://adoptium.net>) và **MySQL Server 8.4** (MySQL Installer, port 3306, root password).
+2. Mở **PowerShell (Run as administrator)** tại thư mục dự án:
 
-CREATE TABLE record_locks (
-  record_id BIGINT PRIMARY KEY,
-  client_id VARCHAR(50) NOT NULL,
-  lock_token CHAR(36) NOT NULL,
-  locked_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  expires_at TIMESTAMP NOT NULL,
-  CONSTRAINT fk_lock_record FOREIGN KEY (record_id)
-    REFERENCES records(record_id) ON DELETE CASCADE
-) ENGINE=InnoDB;
-
-CREATE USER 'appuser'@'%' IDENTIFIED BY 'app123';
-GRANT SELECT,INSERT,UPDATE,DELETE ON shared_records.* TO 'appuser'@'%';
-
-CREATE USER 'replicator'@'%' IDENTIFIED BY 'replica123';
-GRANT REPLICATION SLAVE ON *.* TO 'replicator'@'%';
-FLUSH PRIVILEGES;
+```powershell
+Set-ExecutionPolicy -Scope Process Bypass -Force
+.\scripts\setup_mysql_windows.ps1 -ServerId 2 -RootPass "mat_khau_root"
 ```
 
-4. Sửa `C:\ProgramData\MySQL\MySQL Server 8.4\my.ini`, thêm dưới `[mysqld]`:
+Script tự làm: sao lưu `my.ini`, bật GTID + binlog + `log_replica_updates`, `bind-address=0.0.0.0`, tạo DB/bảng/user, mở firewall 3306.
+
+Nếu muốn làm tay, thêm dưới `[mysqld]` trong `C:\ProgramData\MySQL\MySQL Server 8.4\my.ini`:
 
 ```ini
 bind-address = 0.0.0.0
@@ -110,8 +92,11 @@ enforce_gtid_consistency = ON
 log_replica_updates = ON
 ```
 
-5. Restart service: `net stop MySQL84 && net start MySQL84`
-6. Mở firewall: `netsh advfirewall firewall add rule name="MySQL" dir=in action=allow protocol=TCP localport=3306`
+rồi `net stop MySQL84 && net start MySQL84`, chạy `sql/init_shared_records.sql`, và mở firewall:
+
+```cmd
+netsh advfirewall firewall add rule name="MySQL 3306" dir=in action=allow protocol=TCP localport=3306
+```
 
 ---
 
@@ -143,16 +128,23 @@ Nếu lỗi:
 
 ## GIAI ĐOẠN 4 — BẬT ĐỒNG BỘ HAI CHIỀU
 
-### Trên Server 1
+### Trên Server 1 (Ubuntu)
 
 ```bash
-sudo bash scripts/setup_replication.sh <IP_SERVER_2>
+sudo bash scripts/setup_replication.sh 192.168.161.131
 ```
 
-### Trên Server 2
+### Trên Server 2 (Windows — máy bạn bè)
+
+```powershell
+Set-ExecutionPolicy -Scope Process Bypass -Force
+.\scripts\setup_replication_windows.ps1 -PeerHost 172.16.228.141 -RootPass "mat_khau_root"
+```
+
+### Trên Server 2 nếu dùng Ubuntu
 
 ```bash
-sudo bash scripts/setup_replication.sh <IP_SERVER_1>
+sudo bash scripts/setup_replication.sh 172.16.228.141
 ```
 
 ### Kiểm tra
@@ -205,10 +197,10 @@ Sửa:
 
 ```properties
 ROLE=SERVER1
-CLIENT_ID=CLIENT-2
-server1.host=<IP_SERVER_1>
-server2.host=<IP_SERVER_2>
-lockManager.host=<IP_SERVER_1>
+CLIENT_ID=SERVER-1
+server1.host=172.16.228.141
+server2.host=192.168.161.131
+lockManager.host=172.16.228.141
 ```
 
 ### Server 2
@@ -219,13 +211,13 @@ cp configs/server2.properties config.properties
 
 ```properties
 ROLE=SERVER2
-CLIENT_ID=CLIENT-2
-server1.host=<IP_SERVER_2>
-server2.host=<IP_SERVER_2>
-lockManager.host=<IP_SERVER_1>
+CLIENT_ID=SERVER-2
+server1.host=172.16.228.141
+server2.host=192.168.161.131
+lockManager.host=172.16.228.141
 ```
 
-### Client 1 (VMware của bạn)
+### Client 1 (máy của bạn)
 
 ```bash
 cp configs/client1.properties config.properties
@@ -234,21 +226,22 @@ cp configs/client1.properties config.properties
 ```properties
 ROLE=CLIENT1
 CLIENT_ID=CLIENT-1
-server2.host=<IP_SERVER_2>
-lockManager.host=<IP_SERVER_1>
+server2.host=192.168.161.131
+lockManager.host=172.16.228.141
 ```
 
-### Client 2 (VMware của bạn bè)
+### Client 2 (máy bạn bè, Windows)
 
-```bash
-cp configs/client2.properties config.properties
+```cmd
+run.bat client2
 ```
 
 ```properties
 ROLE=CLIENT2
 CLIENT_ID=CLIENT-2
-server1.host=<IP_SERVER_1>
-lockManager.host=<IP_SERVER_1>
+server1.host=172.16.228.141
+server2.host=192.168.161.131
+lockManager.host=172.16.228.141
 ```
 
 > **Điểm mấu chốt**: `lockManager.host` phải **giống nhau trên cả 4 máy** và luôn trỏ về Server 1. Đây là điều đảm bảo hai Client không bao giờ cùng được cấp khóa.
@@ -267,8 +260,10 @@ chmod +x run.sh
 ### Windows
 
 ```cmd
-run.bat
+run.bat client2
 ```
+
+hoặc nhấp đúp **`chay_client2.bat`**. Chạy app ngay trên Server 2: `run.bat server2`.
 
 ### Kiểm tra giao diện
 

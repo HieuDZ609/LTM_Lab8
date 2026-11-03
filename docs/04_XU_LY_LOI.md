@@ -237,7 +237,88 @@ sudo netplan apply
 
 ---
 
-## 6. Lệnh kiểm tra nhanh
+## 6. Lỗi riêng trên Windows (máy bạn bè)
+
+### `... cannot be loaded because running scripts is disabled on this system`
+
+```powershell
+Set-ExecutionPolicy -Scope Process Bypass -Force
+```
+
+### `Không thấy service MySQL` / `Không tìm thấy mysql.exe`
+
+Kiểm tra tên service và đường dẫn cài:
+
+```powershell
+Get-Service *mysql*
+Get-ChildItem 'C:\Program Files\MySQL' -Directory
+```
+
+Nếu `my.ini` ở chỗ khác, truyền tay:
+
+```powershell
+.\scripts\setup_mysql_windows.ps1 -ServerId 2 -RootPass "..." `
+  -MyIniPath "C:\ProgramData\MySQL\MySQL Server 8.4\my.ini"
+```
+
+### MySQL không start sau khi sửa my.ini
+
+Khôi phục bản sao lưu rồi sửa lại:
+
+```powershell
+Get-ChildItem 'C:\ProgramData\MySQL' -Recurse -Filter 'my.ini.bak_*' |
+  Sort-Object LastWriteTime -Descending | Select-Object -First 1
+Copy-Item '<file_bak_moi_nhat>' 'C:\ProgramData\MySQL\MySQL Server 8.4\my.ini' -Force
+Restart-Service MySQL84
+```
+
+Xem log lỗi:
+
+```powershell
+Get-Content 'C:\ProgramData\MySQL\MySQL Server 8.4\Data\*.err' -Tail 40
+```
+
+### `Access denied ... root` khi chạy script
+
+Root có mật khẩu nhưng chưa truyền:
+
+```powershell
+.\scripts\setup_mysql_windows.ps1 -ServerId 2 -RootPass "mat_khau_root"
+```
+
+### `Replica_IO_Running = Connecting` giữa Ubuntu ↔ Windows
+
+1. Kiểm tra cổng: `Test-NetConnection <IP_SERVER_1> -Port 3306`
+2. Kiểm tra user đồng bộ trên **máy nhận**:
+
+```sql
+SELECT user, host FROM mysql.user WHERE user IN ('replicator','appuser');
+SHOW GRANTS FOR 'replicator'@'%';
+```
+
+3. Xem lỗi cụ thể:
+
+```powershell
+& 'C:\Program Files\MySQL\MySQL Server 8.4\bin\mysql.exe' -u root -p -e "SHOW REPLICA STATUS\G"
+```
+
+4. Nếu `replicator` chưa `REQUIRE SSL`, chạy lại `sql/init_shared_records.sql`.
+
+### Dấu `\` trong PowerShell
+
+Dùng `\` trong đường dẫn Windows vẫn được, nhưng nếu gặp lỗi escape thì dùng `/`:
+
+```powershell
+cd C:/duong/dan/LTM_Lab8
+```
+
+### Chữ Việt trong cmd bị lỗi font
+
+`run.bat` đã `chcp 65001`; nếu vẫn lỗi, chuột phải tiêu đề cmd → Properties → Font → **Consolas**.
+
+---
+
+## 7. Lệnh kiểm tra nhanh
 
 ```bash
 # Toàn bộ trạng thái hệ thống

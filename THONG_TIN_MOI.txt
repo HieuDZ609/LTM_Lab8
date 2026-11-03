@@ -1,18 +1,93 @@
-ĐÃ TRIỂN KHAI TRÊN 3 VM + DESKTOP
+==========================================================
+  THÔNG TIN TRIỂN KHAI — 4 MÁY (mạng VKU_Student)
+  Cập nhật: 03/11/2026
+==========================================================
 
-IP:
-- Desktop (bạn): 172.16.228.141  (MySQL + Lock Manager) - có thể chạy app làm CLIENT1
-- VM1: 172.16.228.145         (Server2) 
-- VM2: 172.16.228.146         (Client2)
+MÔ HÌNH
+-------
+  Client 1 (máy bạn)  --Wi-Fi-->  Server 1 (VMware của bạn)
+        \                              |
+         \                        đồng bộ 2 chiều (GTID)
+          \                            |
+  Client 2 (máy bạn bè) --Wi-Fi-->  Server 2 (VMware của bạn bè)
 
-Tất cả đã cài MySQL, tạo shared_records, bật GTID replication.
-Server2 (145) replicate từ Server1 (141)
-Client2 VM (146) replicate từ Server1 (141)  
-Server1 replicate từ Server2 (145) - đồng bộ hai chiều
+  Server 1 = LOCK MANAGER duy nhất: mọi thao tác TẠO / XÓA / KHÓA
+  đều đi về Server 1, sau đó MySQL tự đồng bộ sang Server 2.
 
-Cấu hình app:
-- Desktop: cp configs/desktop_server1_client1.properties config.properties  -> ROLE=CLIENT1 CLIENT_ID=CLIENT-1
-- VM 145:   cp configs/vm_server2.properties config.properties  -> ROLE=SERVER2
-- VM 146:   cp configs/vm_client2.properties config.properties  -> ROLE=CLIENT2 CLIENT_ID=CLIENT-2
+IP & VAI TRÒ
+------------
+  Client 1 : 172.26.40.121      (Wi-Fi VKU_Student, máy bạn)
+  Server 1 : 172.16.228.141     (VMware trên máy bạn)  <-- LOCK MANAGER
+  Client 2 : 172.26.82.95       (Wi-Fi VKU_Student, máy bạn bè)
+  Server 2 : 192.168.161.131    (VMware trên máy bạn bè, Windows)
 
-Chạy: ./run.sh (Linux) hoặc run.bat (Windows)
+  * IP Wi-Fi là DHCP -> đổi sau khi restart. Kiểm tra:  ipconfig / hostname -I
+  * lockManager.host phải GIỐNG NHAU trên cả 4 máy = 172.16.228.141
+
+CẤU HÌNH APP (chọn theo máy)
+----------------------------
+  Máy bạn       : cp configs/client1.properties config.properties   (ROLE=CLIENT1)
+  Máy bạn bè    : copy configs\client2.properties config.properties (ROLE=CLIENT2)
+  Trên Server 1 : cp configs/server1.properties config.properties   (ROLE=SERVER1)
+  Trên Server 2 : cp configs/server2.properties config.properties   (ROLE=SERVER2)
+
+  Trên Windows chỉ cần:  run.bat client2     (tự copy config + biên dịch + chạy)
+                         run.bat server2
+  Hoặc nhấp đúp:         chay_client2.bat / chay_server2.bat
+
+MYSQL (đã cài trên cả 2 server)
+-------------------------------
+  Server 1 (Ubuntu) : sudo bash scripts/setup_mysql_ubuntu.sh 1
+  Server 2 (Windows): .\scripts\setup_mysql_windows.ps1 -ServerId 2 -RootPass "..."
+
+  Bật đồng bộ:
+    Server 1: sudo bash scripts/setup_replication.sh 192.168.161.131
+    Server 2: .\scripts\setup_replication_windows.ps1 -PeerHost 172.16.228.141 -RootPass "..."
+
+  Kỳ vọng: Replica_IO_Running = Yes, Replica_SQL_Running = Yes
+
+QUAN TRỌNG — NAT vs BRIDGED
+---------------------------
+  172.16.228.141 và 192.168.161.131 là IP nội bộ VMware NAT,
+  KHÔNG ping chéo giữa 2 máy được.
+
+  Cách A (khuyến nghị): đổi card mạng VM sang BRIDGED -> VM nhận IP
+    172.26.x.x cùng Wi-Fi, rồi cập nhật lại IP trong configs/*.properties.
+  Cách B: giữ NAT, port forwarding 3307 -> 3306 (VMware Virtual Network Editor),
+    rồi dùng IP Wi-Fi + port 3307 khi kết nối chéo.
+
+  Chi tiết + ảnh minh hoạ từng bước: docs/05_HUONG_DAN_WINDOWS.md (mục 1)
+
+TÀI KHOẢN MẶC ĐỊNH
+------------------
+  appuser    / app123       (ứng dụng: SELECT/INSERT/UPDATE/DELETE)
+  replicator / replica123   (đồng bộ, yêu cầu SSL)
+
+CHỨC NĂNG APP
+-------------
+  Tab 1: danh sách bản ghi + Tạo mới + XÓA bản ghi đã chọn
+  Tab 2: KHÓA bản ghi (trả LOCK_TOKEN) / GIẢI PHÓNG (đúng token)
+  Tab 3: kiểm tra kết nối 2 server + trạng thái đồng bộ + replication
+  Tab 4: nhật ký thao tác
+
+  Xóa bản ghi đang bị khóa -> bị chặn (phải giải phóng trước).
+
+CHẠY APP
+--------
+  Linux  : ./run.sh                 (hoặc ./run.sh client1)
+  Windows: run.bat client2          (hoặc chay_client2.bat)
+
+DỪNG APP
+--------
+  Linux  : pkill -9 -f 'com.ltm.Main'
+  Windows: đóng cửa sổ app
+
+TÀI LIỆU
+--------
+  README.md
+  docs/01_KIEN_TRUC.md
+  docs/02_HUONG_DAN_TRIEN_KHAI.md
+  docs/03_KICH_BAN_KIEM_THU.md
+  docs/04_XU_LY_LOI.md
+  docs/05_HUONG_DAN_WINDOWS.md     <-- dành cho máy bạn bè
+==========================================================

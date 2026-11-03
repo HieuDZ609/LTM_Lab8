@@ -4,62 +4,75 @@
 ==========================================================
 
 MÔ HÌNH
-  Server 1 (máy bạn)     : MySQL + Lock Manager
-  Server 2 (máy bạn bè)  : MySQL + replica
-  Client 1 (VM của bạn)  : app Java, ghi qua Server 1
-  Client 2 (VM bạn bè)   : app Java, ghi qua Server 1
+  Server 1 (VMware máy bạn)     : 172.16.228.141  MySQL + LOCK MANAGER
+  Server 2 (VMware máy bạn bè)  : 192.168.161.131 MySQL + replica
+  Client 1 (máy bạn)            : 172.26.40.121  ROLE=CLIENT1
+  Client 2 (máy bạn bè)         : 172.26.82.95   ROLE=CLIENT2
+
+  Mọi thao tác TẠO / XÓA / KHÓA đều đi về Server 1,
+  sau đó MySQL đồng bộ hai chiều (GTID) sang Server 2.
 
 ----------------------------------------------------------
-BƯỚC 1 – CÀI MYSQL (làm trên CẢ 2 SERVER, Ubuntu)
+BƯỚC 1 – CÀI MYSQL
 ----------------------------------------------------------
-  sudo bash scripts/setup_mysql_ubuntu.sh 1     # máy Server 1
-  sudo bash scripts/setup_mysql_ubuntu.sh 2     # máy Server 2
+  Server 1 (Ubuntu):
+     sudo bash scripts/setup_mysql_ubuntu.sh 1
 
-  (Windows: xem docs/02_HUONG_DAN_TRIEN_KHAI.md)
+  Server 2 (Windows, PowerShell Administrator):
+     Set-ExecutionPolicy -Scope Process Bypass -Force
+     .\scripts\setup_mysql_windows.ps1 -ServerId 2 -RootPass "mat_khau_root"
+
+  Script tự: bật GTID + binlog + log_replica_updates, bind 0.0.0.0,
+  tạo DB shared_records + bảng + user, mở firewall 3306.
 
 ----------------------------------------------------------
 BƯỚC 2 – BẬT ĐỒNG BỘ HAI CHIỀU
 ----------------------------------------------------------
-  Trên Server 1:  sudo bash scripts/setup_replication.sh <IP_SERVER_2>
-  Trên Server 2:  sudo bash scripts/setup_replication.sh <IP_SERVER_1>
+  Trên Server 1: sudo bash scripts/setup_replication.sh <IP_SERVER_2>
+  Trên Server 2: .\scripts\setup_replication_windows.ps1 -PeerHost <IP_SERVER_1>
 
-  Kiểm tra (cả 2 máy):
-    mysql -e "SHOW REPLICA STATUS\G" | grep -E "IO_Running|SQL_Running"
-  → phải thấy: Replica_IO_Running: Yes
-               Replica_SQL_Running: Yes
+  Kiểm tra:  SHOW REPLICA STATUS\G
+  → Replica_IO_Running: Yes
+    Replica_SQL_Running: Yes
 
 ----------------------------------------------------------
-BƯỚC 3 – SỬA IP TRONG config.properties
+BƯỚC 3 – CHỌN CẤU HÌNH THEO MÁY
 ----------------------------------------------------------
-  Lấy IP:  hostname -I
+  Linux  : cp configs/client1.properties config.properties
+  Windows: run.bat client2        (tự copy configs\client2.properties)
 
-  Mọi máy đều phải có:
-     lockManager.host = <IP_SERVER_1>     ← GIỐNG NHAU TRÊN CẢ 4 MÁY
+  Vai trò có sẵn trong configs/:
+     client1 | client2 | server1 | server2
+     desktop_server1_client1 | vm_server2 | vm_client2
 
-  Client 1: ROLE=CLIENT1  CLIENT_ID=CLIENT-1
-  Client 2: ROLE=CLIENT2  CLIENT_ID=CLIENT-2
-  Server 1: ROLE=SERVER1  CLIENT_ID=CLIENT-2
-  Server 2: ROLE=SERVER2  CLIENT_ID=CLIENT-2
-
-  Mẫu sẵn trong thư mục configs/:
-     cp configs/client1.properties config.properties
+  Quy tắc: lockManager.host = IP SERVER 1 (giống nhau trên mọi máy)
 
 ----------------------------------------------------------
 BƯỚC 4 – CHẠY APP
 ----------------------------------------------------------
-  Linux  :  ./run.sh
-  Windows:  run.bat
+  Linux  : ./run.sh                (JDK 17+: sudo apt install default-jdk)
+  Windows: run.bat client2         (JDK 17/21: https://adoptium.net)
+           hoặc nhấp đúp chay_client2.bat
 
-  Cần JDK 17+  (Ubuntu: sudo apt install default-jdk)
+  App cũng chạy được trên server: run.bat server2 / ./run.sh server1
 
 ----------------------------------------------------------
-DEMO 5 BƯỚC
+DEMO 6 BƯỚC
 ----------------------------------------------------------
-  1. Client 1 tạo SV010          → Client 2 tải lại thấy SV010  (đồng bộ)
-  2. Client 2 tạo lại SV010      → báo "Mã đã tồn tại"         (chống trùng)
+  1. Client 1 tạo SV010          → Client 2 tải lại thấy SV010   (đồng bộ)
+  2. Client 2 tạo lại SV010      → "Mã đã tồn tại"               (chống trùng)
   3. Client 1 khóa SV010         → nhận LOCK_TOKEN
-  4. Client 2 khóa SV010         → báo "đang được sử dụng"
-  5. Client 1 giải phóng → Client 2 khóa lại được
+  4. Client 2 khóa SV010         → "đang được sử dụng"
+  5. Client 1 giải phóng         → Client 2 khóa lại được        (đúng token)
+  6. Client 1 xóa SV010          → Client 2 tải lại không còn    (xóa + đồng bộ)
+
+----------------------------------------------------------
+LƯU Ý QUAN TRỌNG
+----------------------------------------------------------
+  IP 172.16.x.x và 192.168.x.x của VMware là mạng NAT nội bộ,
+  KHÔNG ping chéo giữa 2 máy. Phải chuyển VM sang BRIDGED
+  hoặc dùng NAT port forwarding 3307. Xem:
+     docs/05_HUONG_DAN_WINDOWS.md  (mục 1)
 
 ----------------------------------------------------------
 TÀI KHOẢN MẶC ĐỊNH
@@ -70,9 +83,10 @@ TÀI KHOẢN MẶC ĐỊNH
 ----------------------------------------------------------
 TÀI LIỆU
 ----------------------------------------------------------
-  README.md                        tổng quan
-  docs/01_KIEN_TRUC.md             kiến trúc + lý do thiết kế
-  docs/02_HUONG_DAN_TRIEN_KHAI.md  hướng dẫn từng bước
-  docs/03_KICH_BAN_KIEM_THU.md     21 test case
-  docs/04_XU_LY_LOI.md             lỗi thường gặp
+  README.md                          tổng quan
+  docs/01_KIEN_TRUC.md               kiến trúc + lý do thiết kế
+  docs/02_HUONG_DAN_TRIEN_KHAI.md    triển khai từng bước
+  docs/03_KICH_BAN_KIEM_THU.md       kịch bản kiểm thử
+  docs/04_XU_LY_LOI.md               lỗi thường gặp
+  docs/05_HUONG_DAN_WINDOWS.md       hướng dẫn cho máy Windows
 ==========================================================
