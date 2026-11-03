@@ -101,22 +101,32 @@ cp configs/client1.properties config.properties
 ./run.sh
 ```
 
-### 3.2. Trên Windows (Server 2 / máy bạn bè)
+### 3.2. Trên máy bạn bè (Windows) — Client 2 + Server 2
 
-Chạy **PowerShell với quyền Administrator**:
+Máy Windows chỉ cần **JDK 21** và mã nguồn:
 
-```powershell
-# 1. Cấu hình MySQL: GTID, binlog, bind 0.0.0.0, tạo DB/bảng/user, mở firewall
-.\scripts\setup_mysql_windows.ps1 -ServerId 2 -RootPass "mat_khau_root"
-
-# 2. Bật đồng bộ về Server 1
-.\scripts\setup_replication_windows.ps1 -PeerHost 172.16.228.141 -RootPass "mat_khau_root"
-
-# 3. Chạy app (tự copy config + biên dịch)
+```cmd
+git clone https://github.com/HieuDZ609/LTM_Lab8.git
+cd LTM_Lab8
 run.bat client2
 ```
 
-Hoặc nhấp đúp **`chay_client2.bat`**. Chi tiết: [`docs/05_HUONG_DAN_WINDOWS.md`](docs/05_HUONG_DAN_WINDOWS.md).
+Nếu Server 2 (trong VMware) là **Ubuntu**, làm trong máy ảo:
+
+```bash
+sudo bash scripts/setup_mysql_ubuntu.sh 2
+sudo bash scripts/setup_replication.sh 172.16.228.141
+```
+
+Nếu Server 2 là **Windows**, chạy PowerShell (Administrator) tại thư mục dự án:
+
+```powershell
+Set-ExecutionPolicy -Scope Process Bypass -Force
+.\scripts\setup_mysql_windows.ps1 -ServerId 2 -RootPass "mat_khau_root"
+.\scripts\setup_replication_windows.ps1 -PeerHost 172.16.228.141 -RootPass "mat_khau_root"
+```
+
+Hoặc nhấp đúp **`chay_client2.bat`**. Chi tiết đầy đủ: [`docs/05_HUONG_DAN_WINDOWS.md`](docs/05_HUONG_DAN_WINDOWS.md).
 
 ### 3.3. Chạy app trên server
 

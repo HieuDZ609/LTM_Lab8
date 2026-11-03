@@ -22,6 +22,8 @@ BƯỚC 1 – CÀI MYSQL
      Set-ExecutionPolicy -Scope Process Bypass -Force
      .\scripts\setup_mysql_windows.ps1 -ServerId 2 -RootPass "mat_khau_root"
 
+  (Nếu Server 2 chạy Ubuntu: sudo bash scripts/setup_mysql_ubuntu.sh 2)
+
   Script tự: bật GTID + binlog + log_replica_updates, bind 0.0.0.0,
   tạo DB shared_records + bảng + user, mở firewall 3306.
 

@@ -39,10 +39,12 @@ MYSQL (đã cài trên cả 2 server)
 -------------------------------
   Server 1 (Ubuntu) : sudo bash scripts/setup_mysql_ubuntu.sh 1
   Server 2 (Windows): .\scripts\setup_mysql_windows.ps1 -ServerId 2 -RootPass "..."
+  Server 2 (Ubuntu) : sudo bash scripts/setup_mysql_ubuntu.sh 2
 
   Bật đồng bộ:
-    Server 1: sudo bash scripts/setup_replication.sh 192.168.161.131
-    Server 2: .\scripts\setup_replication_windows.ps1 -PeerHost 172.16.228.141 -RootPass "..."
+    Server 1: sudo bash scripts/setup_replication.sh <IP_SERVER_2>
+    Server 2: .\scripts\setup_replication_windows.ps1 -PeerHost <IP_SERVER_1> -RootPass "..."
+    (Server 2 Ubuntu: sudo bash scripts/setup_replication.sh <IP_SERVER_1>)
 
   Kỳ vọng: Replica_IO_Running = Yes, Replica_SQL_Running = Yes
 
